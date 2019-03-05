@@ -15,20 +15,22 @@ const (
 
 // ShutdownActions is a set of actions that are run when the os receives an Interrupt signal.
 type ShutdownActions struct {
-	once    *sync.Once
-	order   Order
-	actions []func()
-	closeCh chan struct{}
+	order        Order
+	actions      []func()
+	closeCh      chan struct{}
+	closeOnce    sync.Once
+	shutdownOnce sync.Once
 }
 
 // NewShutdownActions creates a new set of shutdown actions and starts listen for any of the signals provided.
 // The order determines the order the actions will be executed.
 func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
 	sa := &ShutdownActions{
-		once:    &sync.Once{},
-		order:   order,
-		actions: make([]func(), 0),
-		closeCh: make(chan struct{}),
+		order:        order,
+		actions:      make([]func(), 0),
+		closeCh:      make(chan struct{}),
+		closeOnce:    sync.Once{},
+		shutdownOnce: sync.Once{},
 	}
 
 	go sa.start(signals)
@@ -42,11 +44,9 @@ func (sa *ShutdownActions) AddActions(actions ...func()) {
 
 // Shutdown sends close message and shuts down
 func (sa *ShutdownActions) Shutdown() {
-	select {
-	case <-sa.closeCh:
-	default:
+	sa.closeOnce.Do(func() {
 		close(sa.closeCh)
-	}
+	})
 	sa.shutdown()
 }
 
@@ -68,7 +68,7 @@ func (sa *ShutdownActions) start(signals []os.Signal) {
 
 // Runs shutdown actions
 func (sa *ShutdownActions) shutdown() {
-	sa.once.Do(
+	sa.shutdownOnce.Do(
 		func() {
 			l := len(sa.actions)
 			for i := 0; i < l; i++ {
