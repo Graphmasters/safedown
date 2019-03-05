@@ -61,7 +61,7 @@ func (sa *ShutdownActions) Shutdown() {
 	sa.shutdown()
 }
 
-// onSignal passes the signal calls the on signal function
+// onSignal passes the signal received to the on signal function
 func (sa *ShutdownActions) onSignal(s os.Signal) {
 	sa.onSignalMutex.Lock()
 	defer sa.onSignalMutex.Unlock()
