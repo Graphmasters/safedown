@@ -74,6 +74,11 @@ func (sa *ShutdownActions) onSignal(s os.Signal) {
 
 // start listens for an interrupt signal and runs
 func (sa *ShutdownActions) start(signals []os.Signal) {
+	// Checks if there are signals to listen for
+	if len(signals) == 0 {
+		return
+	}
+
 	// Notification channel
 	signalCh := make(chan os.Signal)
 	signal.Notify(signalCh, signals...)
