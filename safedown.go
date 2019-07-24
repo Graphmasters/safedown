@@ -90,6 +90,10 @@ func (sa *ShutdownActions) start(signals []os.Signal) {
 	case <-sa.stopCh:
 	}
 
+	// Stops listening for signals
+	signal.Stop(signalCh)
+	close(signalCh)
+
 	// runs shutdown actions
 	sa.shutdown()
 }
