@@ -80,7 +80,7 @@ func (sa *ShutdownActions) start(signals []os.Signal) {
 	}
 
 	// Notification channel
-	signalCh := make(chan os.Signal)
+	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, signals...)
 
 	// Listens for signals and close message
