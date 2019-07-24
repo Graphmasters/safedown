@@ -16,13 +16,13 @@ const (
 
 // ShutdownActions is a set of actions that are run when the os receives an Interrupt signal.
 type ShutdownActions struct {
-	order         Order
-	actions       []func()
-	onSignalMutex sync.Mutex
-	onSignalFunc  func(os.Signal)
-	closeCh       chan struct{}
-	closeOnce     sync.Once
-	shutdownOnce  sync.Once
+	order         Order           // This determines the order the actions will be done.
+	actions       []func()        // The actions done on shutdown.
+	onSignalMutex sync.Mutex      // A mutex for handling the onSignalFunc.
+	onSignalFunc  func(os.Signal) // The function to be called when a signal is received.
+	stopCh        chan struct{}   // A channel to stop listening for signals.
+	stopOnce      sync.Once       // Ensures listening to signals is stopped once.
+	shutdownOnce  sync.Once       // Ensures shutdown actions are only done once.
 }
 
 // NewShutdownActions creates a new set of shutdown actions and starts listen for any of the signals provided.
@@ -33,8 +33,8 @@ func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
 		actions:       make([]func(), 0),
 		onSignalMutex: sync.Mutex{},
 		onSignalFunc:  nil,
-		closeCh:       make(chan struct{}),
-		closeOnce:     sync.Once{},
+		stopCh:        make(chan struct{}),
+		stopOnce:      sync.Once{},
 		shutdownOnce:  sync.Once{},
 	}
 
@@ -42,22 +42,22 @@ func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
 	return sa
 }
 
-// AddActions adds actions to be run on shutdown
+// AddActions adds actions to be run on shutdown or when a signal is received.
 func (sa *ShutdownActions) AddActions(actions ...func()) {
 	sa.actions = append(sa.actions, actions...)
 }
 
-// SetOnSignal sets the method which will be called when a signal is received
+// SetOnSignal sets the method which will be called when a signal is received.
 func (sa *ShutdownActions) SetOnSignal(onSignal func(os.Signal)) {
 	sa.onSignalMutex.Lock()
 	defer sa.onSignalMutex.Unlock()
 	sa.onSignalFunc = onSignal
 }
 
-// Shutdown sends close message and shuts down
+// Shutdown runs the shutdown actions and stops listening for signals.
 func (sa *ShutdownActions) Shutdown() {
-	sa.closeOnce.Do(func() {
-		close(sa.closeCh)
+	sa.stopOnce.Do(func() {
+		close(sa.stopCh)
 	})
 	sa.shutdown()
 }
@@ -87,14 +87,14 @@ func (sa *ShutdownActions) start(signals []os.Signal) {
 	select {
 	case s := <-signalCh:
 		sa.onSignal(s)
-	case <-sa.closeCh:
+	case <-sa.stopCh:
 	}
 
 	// runs shutdown actions
 	sa.shutdown()
 }
 
-// Runs shutdown actions
+// shutdown runs the shutdown actions
 func (sa *ShutdownActions) shutdown() {
 	sa.shutdownOnce.Do(
 		func() {
