@@ -1,4 +1,4 @@
-// Package safedown provides a graceful way to shutdown application even when an interrupt signal is received.
+// Package safedown provides a graceful way to shutdown an application even when an interrupt signal is received.
 package safedown
 
 import (
