@@ -28,18 +28,31 @@ type ShutdownActions struct {
 // NewShutdownActions creates a new set of shutdown actions and starts listen for any of the signals provided.
 // The order determines the order the actions will be executed.
 func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
-	sa := &ShutdownActions{
-		order:         order,
-		actions:       make([]func(), 0),
-		onSignalMutex: sync.Mutex{},
-		onSignalFunc:  nil,
-		stopCh:        make(chan struct{}),
-		stopOnce:      sync.Once{},
-		shutdownOnce:  sync.Once{},
+	sa := &ShutdownActions{}
+	Initialise(sa, order, signals...)
+	return sa
+}
+
+// Initialise initialises a set of shutdown actions and starts listen for any of the signals provided.
+// The order determines the order the actions will be executed.
+// A panic will occur if the shutdown actions have already been initialised.
+//
+// It is generally preferable to use the NewShutdownActions method, unless you are concerned about
+// the ShutdownActions escaping to the heap.
+func Initialise(sa *ShutdownActions, order Order, signals ...os.Signal) {
+	// Checks if shutdown actions have already been initialised
+	if sa.stopCh != nil {
+		panic("shutdown actions cannot be initialised twice")
 	}
 
-	go sa.start(signals)
-	return sa
+	// Sets order and creates stop channel
+	sa.order = order
+	sa.stopCh = make(chan struct{})
+
+	// Checks if there are signals to be listen to
+	if len(signals) > 0 {
+		go sa.start(signals)
+	}
 }
 
 // AddActions adds actions to be run on shutdown or when a signal is received.
@@ -50,8 +63,8 @@ func (sa *ShutdownActions) AddActions(actions ...func()) {
 // SetOnSignal sets the method which will be called when a signal is received.
 func (sa *ShutdownActions) SetOnSignal(onSignal func(os.Signal)) {
 	sa.onSignalMutex.Lock()
-	defer sa.onSignalMutex.Unlock()
 	sa.onSignalFunc = onSignal
+	sa.onSignalMutex.Unlock()
 }
 
 // Shutdown runs the shutdown actions and stops listening for signals.
@@ -65,20 +78,14 @@ func (sa *ShutdownActions) Shutdown() {
 // onSignal passes the signal received to the on signal function
 func (sa *ShutdownActions) onSignal(s os.Signal) {
 	sa.onSignalMutex.Lock()
-	defer sa.onSignalMutex.Unlock()
-
 	if sa.onSignalFunc != nil {
 		sa.onSignalFunc(s)
 	}
+	sa.onSignalMutex.Unlock()
 }
 
 // start listens for an interrupt signal and runs
 func (sa *ShutdownActions) start(signals []os.Signal) {
-	// Checks if there are signals to listen for
-	if len(signals) == 0 {
-		return
-	}
-
 	// Notification channel
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, signals...)
