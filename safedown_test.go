@@ -96,7 +96,7 @@ func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
 	sa.AddActions(counter(t, &wg, 1, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 3, &count))
-	sa.shutdown()
+	sa.Shutdown()
 	wg.Wait()
 }
 
@@ -110,7 +110,7 @@ func TestNewShutdownActions_FirstInLastDone(t *testing.T) {
 	sa.AddActions(counter(t, &wg, 3, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 1, &count))
-	sa.shutdown()
+	sa.Shutdown()
 	wg.Wait()
 }
 
