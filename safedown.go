@@ -57,7 +57,7 @@ func Initialise(sa *ShutdownActions, order Order, signals ...os.Signal) {
 	}
 
 	// Starts listen to signal
-	go sa.start(signals)
+	sa.start(signals)
 }
 
 // AddActions adds actions to be run on shutdown or when a signal is received.
@@ -92,10 +92,10 @@ func (sa *ShutdownActions) closeStopCh() {
 }
 
 // onSignal passes the signal received to the on signal function
-func (sa *ShutdownActions) onSignal(s os.Signal) {
+func (sa *ShutdownActions) onSignal(sig os.Signal) {
 	sa.onSignalMutex.Lock()
-	if sa.onSignalFunc != nil {
-		sa.onSignalFunc(s)
+	if sig != nil && sa.onSignalFunc != nil {
+		sa.onSignalFunc(sig)
 	}
 	sa.onSignalMutex.Unlock()
 }
@@ -106,19 +106,24 @@ func (sa *ShutdownActions) start(signals []os.Signal) {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, signals...)
 
-	// Listens for signals and close message
-	select {
-	case s := <-signalCh:
-		sa.onSignal(s)
-	case <-sa.stopCh:
-	}
+	// Starts a go routine for listening for signals and close messages
+	go func() {
+		// Listens for signals and close message
+		var received os.Signal
+		select {
+		case received = <-signalCh:
+		case <-sa.stopCh:
+		}
 
-	// Stops listening for signals
-	signal.Stop(signalCh)
-	close(signalCh)
+		// Stops listening for signals and closes channels
+		signal.Stop(signalCh)
+		close(signalCh)
+		sa.closeStopCh()
 
-	// runs shutdown actions
-	sa.shutdown()
+		// runs shutdown actions
+		sa.onSignal(received)
+		sa.shutdown()
+	}()
 }
 
 // shutdown runs the shutdown actions
