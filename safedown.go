@@ -52,14 +52,34 @@ func Initialise(sa *ShutdownActions, order Order, signals ...os.Signal) {
 	sa.order = order
 	sa.stopCh = make(chan struct{})
 
-	// If there are no signals to listen then the stop channel is not required
+	// If there are no signals to listen to then the stop channel is not required and initialisation is complete
 	if len(signals) == 0 {
 		sa.closeStopCh()
 		return
 	}
 
-	// Starts listen to signal
-	sa.start(signals)
+	// Creates channel to receive notification signals
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, signals...)
+
+	// Starts a go routine for listening for signals and close messages
+	go func() {
+		// Listens for signal or close message
+		var received os.Signal
+		select {
+		case <-sa.stopCh:
+		case received = <-signalCh:
+		}
+
+		// Stops listening for signals and closes channels
+		signal.Stop(signalCh)
+		close(signalCh)
+		sa.closeStopCh()
+
+		// runs on signal and shutdown actions
+		sa.onSignal(received)
+		sa.shutdown()
+	}()
 }
 
 // AddActions adds actions to be run on shutdown or when a signal is received.
@@ -114,32 +134,6 @@ func (sa *ShutdownActions) onSignal(s os.Signal) {
 
 	// Calls the on signal function
 	onSignal(s)
-}
-
-// start listens for an interrupt signal and runs
-func (sa *ShutdownActions) start(signals []os.Signal) {
-	// Notification channel
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, signals...)
-
-	// Starts a go routine for listening for signals and close messages
-	go func() {
-		// Listens for signals and close message
-		var received os.Signal
-		select {
-		case received = <-signalCh:
-		case <-sa.stopCh:
-		}
-
-		// Stops listening for signals and closes channels
-		signal.Stop(signalCh)
-		close(signalCh)
-		sa.closeStopCh()
-
-		// runs shutdown actions
-		sa.onSignal(received)
-		sa.shutdown()
-	}()
 }
 
 // shutdown runs the shutdown actions
