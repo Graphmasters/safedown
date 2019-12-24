@@ -7,6 +7,7 @@ import (
 	"sync"
 )
 
+// Order represents the order that the shutdown actions will be executed.
 type Order bool
 
 const (
@@ -14,7 +15,8 @@ const (
 	FirstInLastDone  Order = false // Actions are executed in the reversed order they are added.
 )
 
-// ShutdownActions is a set of actions that are run when the os receives an Interrupt signal.
+// ShutdownActions contains actions that are run when the os receives an interrupt signal.
+// It is highly recommended that this struct is created using the NewShutdownActions function.
 type ShutdownActions struct {
 	order         Order           // This determines the order the actions will be done.
 	actions       []func()        // The actions done on shutdown.
@@ -38,7 +40,7 @@ func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
 // The order determines the order the actions will be executed.
 // A panic will occur if the shutdown actions have already been initialised.
 //
-// It is generally preferable to use the NewShutdownActions function unless you are explicitly concerned about
+// It is highly recommend that the NewShutdownActions function is used unless one is explicitly concerned about
 // the ShutdownActions escaping to the heap.
 func Initialise(sa *ShutdownActions, order Order, signals ...os.Signal) {
 	// Checks if shutdown actions have already been initialised
@@ -65,7 +67,7 @@ func (sa *ShutdownActions) AddActions(actions ...func()) {
 	sa.actions = append(sa.actions, actions...)
 }
 
-// SetOnSignal sets the method which will be called when a signal is received.
+// SetOnSignal sets the method which will be called if a signal is received.
 func (sa *ShutdownActions) SetOnSignal(onSignal func(os.Signal)) {
 	sa.onSignalMutex.Lock()
 	sa.onSignalFunc = onSignal
