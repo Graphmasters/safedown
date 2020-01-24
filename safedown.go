@@ -22,7 +22,7 @@ type ShutdownActions struct {
 	actions       []func()        // The actions done on shutdown.
 	onSignalFunc  func(os.Signal) // The function to be called when a signal is received.
 	onSignalMutex sync.Mutex      // A mutex to avoid clashes when setting and using onSignalFunc.
-	stopCh        chan struct{}   // A channel to stop listening for signals (is nil if actions are not initialised).
+	stopCh        chan struct{}   // A channel to stop listening for signals.
 	stopOnce      sync.Once       // Ensures listening to signals is stopped once.
 	shutdownOnce  sync.Once       // Ensures shutdown actions are only done once.
 }
