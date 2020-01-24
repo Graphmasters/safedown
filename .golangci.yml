@@ -13,14 +13,14 @@ linters:
 #    - gofmt # Disabled as temporarily unimportant
 #    - goimports # Disabled as temporarily unimportant
 #    - golint # Disabled as temporarily unimportant
-#    - gomnd # Disabled because it is annoying
+    - gomnd # Disabled because it is annoying
 #    - maligned # Disabled as temporarily unimportant
 #    - misspell # Disabled as temporarily unimportant
 #    - lll # Disabled to allow long lines of code
 #    - scopelint # Activated to avoid scope issues
 #    - stylecheck # Disabled as temporarily unimportant
 #    - whitespace # Disabled as temporarily unimportant
-#    - wsl # Disabled as temporarily unimportant
+    - wsl # Disabled as temporarily unimportant
 
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
