@@ -36,33 +36,6 @@ func ExampleNewShutdownActions() {
 	// ... and this will be done last.
 }
 
-func ExampleInitialise() {
-	// Manually creates and initialises the shutdown actions and defers the Shutdown method.
-	// This can be done to avoid the shutdown actions being added to the heap.
-	sa := ShutdownActions{}
-	Initialise(&sa, FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
-	defer sa.Shutdown()
-
-	// Sets the function to be called if a signal is received
-	sa.SetOnSignal(func(signal os.Signal) {
-		fmt.Printf("A signal was received: %s\n", signal.String())
-	})
-
-	// The first action added will be the last done
-	sa.AddActions(func() {
-		fmt.Println("... and this will be done last.")
-	})
-
-	// The last action added will be the first done
-	sa.AddActions(func() {
-		fmt.Println("This will be done first ...")
-	})
-
-	// Output:
-	// This will be done first ...
-	// ... and this will be done last.
-}
-
 // endregion
 
 // region Tests
