@@ -40,6 +40,7 @@ func ExampleNewShutdownActions() {
 
 // region Tests
 
+// nolint: gomnd
 func TestShutdownActions_SetOnSignal(t *testing.T) {
 	finished := setTestTimeout(t, 3*time.Second)
 	defer finished()
@@ -59,6 +60,7 @@ func TestShutdownActions_SetOnSignal(t *testing.T) {
 	wg.Wait()
 }
 
+// nolint: gomnd
 func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
 	finished := setTestTimeout(t, time.Second)
 	defer finished()
@@ -73,6 +75,7 @@ func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
 	wg.Wait()
 }
 
+// nolint: gomnd
 func TestNewShutdownActions_FirstInLastDone(t *testing.T) {
 	cancel := setTestTimeout(t, time.Second)
 	defer cancel()
@@ -93,6 +96,7 @@ func TestNewShutdownActions_FirstInLastDone(t *testing.T) {
 
 // counter creates a function that should be added to the shutdown actions.
 // The test will fail if the value given doesn't increment to the expected value.
+// nolint: gomnd
 func counter(t *testing.T, wg *sync.WaitGroup, expected int, value *int) func() {
 	wg.Add(1)
 	return func() {
