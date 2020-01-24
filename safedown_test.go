@@ -40,8 +40,11 @@ func ExampleNewShutdownActions() {
 
 // region Tests
 
+// TestShutdownActions_OnSignal tests if the correct signal is received.
+// It also indirectly checks that the shutdown actions are intercepting
+// signals as the test will simply fail otherwise.
 // nolint: gomnd
-func TestShutdownActions_SetOnSignal(t *testing.T) {
+func TestShutdownActions_OnSignal(t *testing.T) {
 	finished := setTestTimeout(t, 3*time.Second)
 	defer finished()
 
@@ -60,6 +63,8 @@ func TestShutdownActions_SetOnSignal(t *testing.T) {
 	wg.Wait()
 }
 
+// TestNewShutdownActions_FirstInFirstDone checks that
+// actions are down in the order they were added.
 // nolint: gomnd
 func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
 	finished := setTestTimeout(t, time.Second)
@@ -75,6 +80,9 @@ func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
 	wg.Wait()
 }
 
+// TestNewShutdownActions_FirstInLastDone checks that
+// actions are down in the opposite order to the order they
+// were added.
 // nolint: gomnd
 func TestNewShutdownActions_FirstInLastDone(t *testing.T) {
 	cancel := setTestTimeout(t, time.Second)
