@@ -18,13 +18,13 @@ const (
 // ShutdownActions contains actions that are run when the os receives an interrupt signal.
 // This object must be created using the NewShutdownActions function.
 type ShutdownActions struct {
-	order         Order           // This determines the order the actions will be done.
-	actions       []func()        // The actions done on shutdown.
-	onSignalFunc  func(os.Signal) // The function to be called when a signal is received.
-	onSignalMutex sync.Mutex      // A mutex to avoid clashes when setting and using onSignalFunc.
-	stopCh        chan struct{}   // A channel to stop listening for signals.
-	stopOnce      sync.Once       // Ensures listening to signals is stopped once.
-	shutdownOnce  sync.Once       // Ensures shutdown actions are only done once.
+	order        Order           // This determines the order the actions will be done.
+	actions      []func()        // The actions done on shutdown.
+	onSignalFunc func(os.Signal) // The function to be called when a signal is received.
+	stopCh       chan struct{}   // A channel to stop listening for signals.
+	stopOnce     sync.Once       // Ensures listening to signals is stopped once.
+	shutdownOnce sync.Once       // Ensures shutdown actions are only done once.
+	mutex        sync.Mutex      // A mutex to avoid clashes handling actions or onSignal.
 }
 
 // NewShutdownActions creates and initialises a new set of shutdown actions.
@@ -72,16 +72,16 @@ func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
 // AddActions adds actions to be run on shutdown or when a signal is received.
 // Any action added after a signal has been received or the Shutdown method has been called will not be executed.
 func (sa *ShutdownActions) AddActions(actions ...func()) {
-	sa.onSignalMutex.Lock()
+	sa.mutex.Lock()
 	sa.actions = append(sa.actions, actions...)
-	sa.onSignalMutex.Unlock()
+	sa.mutex.Unlock()
 }
 
 // SetOnSignal sets the method which will be called if a signal is received.
 func (sa *ShutdownActions) SetOnSignal(onSignal func(os.Signal)) {
-	sa.onSignalMutex.Lock()
+	sa.mutex.Lock()
 	sa.onSignalFunc = onSignal
-	sa.onSignalMutex.Unlock()
+	sa.mutex.Unlock()
 }
 
 // Shutdown runs the shutdown actions and stops listening for signals (if doing so).
@@ -106,9 +106,9 @@ func (sa *ShutdownActions) onSignal(s os.Signal) {
 
 	// Gets the on signal function and checks that it is not nil
 	var onSignal func(os.Signal)
-	sa.onSignalMutex.Lock()
+	sa.mutex.Lock()
 	onSignal = sa.onSignalFunc
-	sa.onSignalMutex.Unlock()
+	sa.mutex.Unlock()
 	if onSignal == nil {
 		return
 	}
@@ -122,9 +122,9 @@ func (sa *ShutdownActions) shutdown() {
 	sa.shutdownOnce.Do(
 		func() {
 			// Gets current length of actions
-			sa.onSignalMutex.Lock()
+			sa.mutex.Lock()
 			l := len(sa.actions)
-			sa.onSignalMutex.Unlock()
+			sa.mutex.Unlock()
 
 			// Executes actions in order
 			for i := 0; i < l; i++ {
