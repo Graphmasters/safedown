@@ -16,7 +16,7 @@ const (
 )
 
 // ShutdownActions contains actions that are run when the os receives an interrupt signal.
-// It is highly recommended that this struct is created using the NewShutdownActions function.
+// This object must be created using the NewShutdownActions function.
 type ShutdownActions struct {
 	order        Order           // This determines the order the actions will be done.
 	actions      []func()        // The actions done on shutdown.
@@ -31,31 +31,16 @@ type ShutdownActions struct {
 // The actions (added later) will be executed if any of the signals provided are received.
 // The order determines the order the actions will be executed.
 func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
-	sa := &ShutdownActions{}
-	Initialise(sa, order, signals...)
-	return sa
-}
-
-// Initialise initialises a set of shutdown actions and starts listen for any of the signals provided.
-// The order determines the order the actions will be executed.
-// A panic will occur if the shutdown actions have already been initialised.
-//
-// It is highly recommend that the NewShutdownActions function is used unless one is explicitly concerned about
-// the ShutdownActions escaping to the heap.
-func Initialise(sa *ShutdownActions, order Order, signals ...os.Signal) {
-	// Checks if shutdown actions have already been initialised
-	if sa.stopCh != nil {
-		panic("shutdown actions cannot be initialised twice")
+	// Creates struct with order and stop channel
+	sa := &ShutdownActions{
+		order:  order,
+		stopCh: make(chan struct{}),
 	}
-
-	// Sets order and creates stop channel
-	sa.order = order
-	sa.stopCh = make(chan struct{})
 
 	// If there are no signals to listen to then the stop channel is not required and initialisation is complete
 	if len(signals) == 0 {
 		sa.closeStopCh()
-		return
+		return sa
 	}
 
 	// Creates channel to receive notification signals
@@ -76,10 +61,12 @@ func Initialise(sa *ShutdownActions, order Order, signals ...os.Signal) {
 		close(signalCh)
 		sa.closeStopCh()
 
-		// runs on signal and shutdown actions
+		// Runs on signal and shutdown actions
 		sa.onSignal(received)
 		sa.shutdown()
 	}()
+
+	return sa
 }
 
 // AddActions adds actions to be run on shutdown or when a signal is received.
@@ -97,14 +84,8 @@ func (sa *ShutdownActions) SetOnSignal(onSignal func(os.Signal)) {
 	sa.mutex.Unlock()
 }
 
-// Shutdown runs the shutdown actions and stops listening for signals.
+// Shutdown runs the shutdown actions and stops listening for signals (if doing so).
 func (sa *ShutdownActions) Shutdown() {
-	// Checks if the the actions have been initialised
-	if sa.stopCh == nil {
-		panic("can not call shutdown when actions have not been initialised")
-	}
-
-	// Closes stop channel and runs shut down
 	sa.closeStopCh()
 	sa.shutdown()
 }
