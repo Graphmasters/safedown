@@ -45,39 +45,98 @@ func ExampleNewShutdownActions() {
 // signals as the test will simply fail otherwise.
 // nolint: gomnd
 func TestShutdownActions_OnSignal(t *testing.T) {
-	finished := setTestTimeout(t, 3*time.Second)
-	defer finished()
+	// Makes error channel and checks that no errors were passed to it.
+	errs := make(chan error, 1)
+	defer close(errs)
+	defer checkErrors(t, errs)
 
+	// Wait Group for ensuring that every actions that is
+	// supposed to happen does.
 	wg := sync.WaitGroup{}
-	sa := NewShutdownActions(FirstInLastDone, os.Interrupt)
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(3*time.Second))
+
 	wg.Add(1)
-	sa.SetOnSignal(func(signal os.Signal) {
-		if signal != os.Interrupt {
-			t.Logf("signal received was %s instead of %s", signal.String(), os.Interrupt.String())
-			t.Fail()
+	expected := os.Interrupt
+	actionsA := NewShutdownActions(FirstInLastDone, expected)
+	actionsA.SetOnSignal(func(received os.Signal) {
+		if received != expected {
+			errs <- fmt.Errorf("signal received was %s instead of %s", received.String(), expected.String())
 		}
 		wg.Done()
 	})
 
-	sendSignalToSelf(t, os.Interrupt)
-	wg.Wait()
+	// Sends the expected signal
+	sendSignalToSelf(t, expected)
+}
+
+// TestShutdownActions_OnSignal tests if the correct signal is received.
+// It also indirectly checks that the shutdown actions are intercepting
+// signals as the test will simply fail otherwise.
+// nolint: gomnd
+func TestShutdownActions_OnSignal_Multiple(t *testing.T) {
+	// Makes error channel and checks that no errors were sent to it.
+	errs := make(chan error, 3)
+	defer close(errs)
+	defer checkErrors(t, errs)
+
+	// Wait Group for ensuring that every actions that is
+	// supposed to happen does.
+	wg := sync.WaitGroup{}
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(3*time.Second))
+
+	// Lists the expect & unexpected signals as well as
+	// the number of
+	expected := os.Interrupt
+	unexpected := os.Kill
+	wg.Add(2)
+
+	// Shutdown actions only listen for the expected signal.
+	// The OnSignal method should be triggered.
+	actionsA := NewShutdownActions(FirstInLastDone, expected)
+	actionsA.SetOnSignal(func(received os.Signal) {
+		if received != expected {
+			errs <- fmt.Errorf("signal received was %s instead of %s", received.String(), expected.String())
+		}
+		wg.Done()
+	})
+
+	// Shutdown actions listens for the expected and
+	// unexpected signal. The OnSignal method should be
+	// triggered.
+	actionsB := NewShutdownActions(FirstInLastDone, expected, unexpected)
+	actionsB.SetOnSignal(func(received os.Signal) {
+		if received != expected {
+			errs <- fmt.Errorf("signal received was %s instead of %s", received.String(), expected.String())
+		}
+		wg.Done()
+	})
+
+	// Shutdown actions only listen for the unexpected signal.
+	// The OnSignal method should not be triggered.
+	actionsC := NewShutdownActions(FirstInLastDone, unexpected)
+	actionsC.SetOnSignal(func(received os.Signal) {
+		errs <- fmt.Errorf("an unexpected signal (%s) was received", received.String())
+	})
+
+	// Sends the expected signal and sleeps to give it a
+	// chance to be received even when it is unexpected.
+	sendSignalToSelf(t, expected)
+	time.Sleep(time.Second)
 }
 
 // TestNewShutdownActions_FirstInFirstDone checks that
 // actions are down in the order they were added.
 // nolint: gomnd
 func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
-	finished := setTestTimeout(t, time.Second)
-	defer finished()
+	wg := sync.WaitGroup{}
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
 
 	count := 0
-	wg := sync.WaitGroup{}
 	sa := NewShutdownActions(FirstInFirstDone)
 	sa.AddActions(counter(t, &wg, 1, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 3, &count))
 	sa.Shutdown()
-	wg.Wait()
 }
 
 // TestNewShutdownActions_FirstInLastDone checks that
@@ -85,22 +144,54 @@ func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
 // were added.
 // nolint: gomnd
 func TestNewShutdownActions_FirstInLastDone(t *testing.T) {
-	cancel := setTestTimeout(t, time.Second)
-	defer cancel()
+	wg := sync.WaitGroup{}
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
 
 	count := 0
-	wg := sync.WaitGroup{}
 	sa := NewShutdownActions(FirstInLastDone)
 	sa.AddActions(counter(t, &wg, 3, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 1, &count))
 	sa.Shutdown()
-	wg.Wait()
 }
 
 // endregion
 
 // region Helpers
+
+// addWaitGroupDeadline adds waits till either the wait group
+// is done or until the deadline is reached. If the deadline
+// is reached then test fails.
+func addWaitGroupDeadline(t *testing.T, wg *sync.WaitGroup, deadline time.Time) {
+	success := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(success)
+	}()
+
+	select {
+	case <-success:
+	case <-time.After(time.Until(deadline)):
+		t.Fatal("test exceeded timeout")
+	}
+}
+
+// checkErrors checks that the error channel has received no
+// errors.
+func checkErrors(t *testing.T, errs chan error) {
+	for {
+		select {
+		case err, ok := <-errs:
+			if !ok {
+				return
+			}
+
+			t.Fatal(err)
+		default:
+			return
+		}
+	}
+}
 
 // counter creates a function that should be added to the shutdown actions.
 // The test will fail if the value given doesn't increment to the expected value.
@@ -130,25 +221,6 @@ func sendSignalToSelf(t *testing.T, signal os.Signal) {
 	if err != nil {
 		t.Log("could not send signal to process")
 		t.Fail()
-	}
-}
-
-// setTestTimeout returns a function which should be called at the end of the test.
-// If the function is not called before the timeout the test fails.
-func setTestTimeout(t *testing.T, timeout time.Duration) func() {
-	closeCh := make(chan struct{})
-
-	go func() {
-		select {
-		case <-closeCh:
-		case <-time.After(timeout):
-			t.Log("test exceeded timeout")
-			t.Fail()
-		}
-	}()
-
-	return func() {
-		close(closeCh)
 	}
 }
 
