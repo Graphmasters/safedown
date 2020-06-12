@@ -81,3 +81,11 @@ func main() {
 One can also manage shutdown actions across goroutines by 
 creating the shutdown actions without any signals to be 
 listened for.
+
+### F.A.Q.
+
+- *How do I ensure that the shutdown actions complete before
+the program terminates?* Use either `Shutdown()` or 
+`Wait()`. We recommend against using `Wait()` as it is 
+possible the shutdown actions will never be triggered and
+the program will never stop.
