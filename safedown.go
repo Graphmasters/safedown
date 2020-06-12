@@ -69,8 +69,10 @@ func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
 	return sa
 }
 
-// AddActions adds actions to be run on shutdown or when a signal is received.
-// Any action added after a signal has been received or the Shutdown method has been called will not be executed.
+// AddActions adds actions to be run on shutdown or when a
+// signal is received. Any action added after a signal has
+// been received or the Shutdown method has been called will
+// not be executed.
 func (sa *ShutdownActions) AddActions(actions ...func()) {
 	sa.mutex.Lock()
 	sa.actions = append(sa.actions, actions...)
@@ -84,7 +86,11 @@ func (sa *ShutdownActions) SetOnSignal(onSignal func(os.Signal)) {
 	sa.mutex.Unlock()
 }
 
-// Shutdown runs the shutdown actions and stops listening for signals (if doing so).
+// Shutdown runs the shutdown actions and stops listening
+// for signals (if doing so). This method blocks until all
+// shutdown actions have been run, regardless of if they
+// have been triggered by receiving a signal or calling this
+// method.
 func (sa *ShutdownActions) Shutdown() {
 	sa.closeStopCh()
 	sa.shutdown()
