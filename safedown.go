@@ -23,6 +23,7 @@ type ShutdownActions struct {
 	onSignalFunc func(os.Signal) // The function to be called when a signal is received.
 	stopCh       chan struct{}   // A channel to stop listening for signals.
 	stopOnce     sync.Once       // Ensures listening to signals is stopped once.
+	shutdownCh   chan struct{}   // A channel that indicates if shutdown has been completed.
 	shutdownOnce sync.Once       // Ensures shutdown actions are only done once.
 	mutex        sync.Mutex      // A mutex to avoid clashes handling actions or onSignal.
 }
@@ -33,8 +34,9 @@ type ShutdownActions struct {
 func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
 	// Creates struct with order and stop channel
 	sa := &ShutdownActions{
-		order:  order,
-		stopCh: make(chan struct{}),
+		order:      order,
+		stopCh:     make(chan struct{}),
+		shutdownCh: make(chan struct{}),
 	}
 
 	// If there are no signals to listen to then the stop channel is not required and initialisation is complete
@@ -96,6 +98,12 @@ func (sa *ShutdownActions) Shutdown() {
 	sa.shutdown()
 }
 
+// Wait waits until all the shutdown actions have been
+// called.
+func (sa *ShutdownActions) Wait() {
+	<-sa.shutdownCh
+}
+
 // closeStopCh closes the stop channel
 func (sa *ShutdownActions) closeStopCh() {
 	sa.stopOnce.Do(func() {
@@ -140,6 +148,10 @@ func (sa *ShutdownActions) shutdown() {
 					sa.actions[l-i-1]()
 				}
 			}
+
+			// Closes the shutdown channel indicating shutdown
+			// is complete.
+			close(sa.shutdownCh)
 		},
 	)
 }
