@@ -16,7 +16,7 @@ jobs:
   build-and-test:
     working_directory: &working_directory /go/src/github.com/Graphmasters/safedown  # only necessary for Golang build (default: `${HOME:?}/project`)
     docker:
-      - image: golang:1.13
+      - image: golang:1.14
     steps:
       - checkout
       - run: go version  # To see which Go patch-version is used
