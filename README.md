@@ -59,7 +59,7 @@ func main() {
 
     // The shutdown actions are initialised and Shutdown is
     // deferred. This ensures that the shutdown actions are
-    // always run and that the main block the main from 
+    // always run and that the main is blocked from 
     // finishing until the shutdown process is complete.
     sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
     defer sa.Shutdown()
