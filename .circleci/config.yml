@@ -14,12 +14,12 @@ workflows:
 version: 2.1
 jobs:
   build-and-test:
-    working_directory: &working_directory /go/src/github.com/Graphmasters/safedown  # only necessary for Golang build (default: `${HOME:?}/project`)
+    working_directory: &working_directory /project
     docker:
-      - image: golang:1.14
+      - image: golang:1.16
     steps:
       - checkout
-      - run: go version  # To see which Go patch-version is used
+      - run: go version
       - run:
           name: Unit tests
           command: go test --race  ./...
