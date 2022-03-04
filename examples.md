@@ -47,7 +47,7 @@ func main() {
 		Handler: http.HandlerFunc(handler),
 	}
 	sa.AddActions(func() {
-		// The specifics of gracefully shutdown the service, include the timeout
+		// The specifics of gracefully shutting down the service, include the timeout
 		// and error handling, should be decided by the user.
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
