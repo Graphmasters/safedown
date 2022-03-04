@@ -9,7 +9,8 @@ for methods (in this case `cancel`) to be run when a
 termination signal, or similar, is received.
 
 Included below are simple examples to demonstrate the core
-concepts while other common examples can be found [here](common_examples.md). 
+concepts while other more complicated common examples can 
+be found [here](examples.md). 
 
 ```go
 package main
