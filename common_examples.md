@@ -17,7 +17,9 @@ import (
 
 func main() {
 	// Safedown is initialised with the order "FirstInLastDone" to ensure
-	// that the database which will be added first will be closed last.
+	// that the database which will be added first and be closed last. This
+	// will allow the HTTP server to keep using the database while gracefully
+	// shutting down.
 	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
 
 	// The database is opened with the close method being added to the shutdown
