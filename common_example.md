@@ -21,12 +21,15 @@ func main() {
 	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
 
 	// The database is opened with the close method being added to the shutdown
-	// actions.
+	// actions. The choice of database, i.e. "badger", was arbitrary and 
+	// unimportant.
 	db, err := badger.Open(badger.DefaultOptions("/path/to/badger/file"))
 	if err != nil {
 		log.Fatalf("unable to open badger: %v", err)
 	}
 	sa.AddActions(func() {
+		// It is upto the user how the error (if applicable) from closing 
+		// should be handled.
 		if err := db.Close(); err != nil {
 			log.Printf("failed to close database: %v", err)
 		}
@@ -42,6 +45,8 @@ func main() {
 		Handler: http.HandlerFunc(handler),
 	}
 	sa.AddActions(func() {
+		// The specifics of gracefully shutdown the service, include the timeout
+		// and error handling, should be decided by the user.
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
