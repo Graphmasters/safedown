@@ -23,21 +23,21 @@ func main() {
 	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
 
 	// The database is opened with the close method being added to the shutdown
-	// actions. The choice of database, i.e. "badger", was arbitrary and 
+	// actions. The choice of database, i.e. "badger", was arbitrary and
 	// unimportant.
 	db, err := badger.Open(badger.DefaultOptions("/path/to/badger/file"))
 	if err != nil {
 		log.Fatalf("unable to open badger: %v", err)
 	}
 	sa.AddActions(func() {
-		// It is upto the user how the error (if applicable) from closing 
+		// It is upto the user how the error (if applicable) from closing
 		// should be handled.
 		if err := db.Close(); err != nil {
 			log.Printf("failed to close database: %v", err)
 		}
 	})
 
-	// A service is created with its shutdown method being added to the 
+	// A service is created with its shutdown method being added to the
 	// shutdown actions.
 	handler := func(writer http.ResponseWriter, request *http.Request) {
 		// TODO: Write your handle method which uses the database
@@ -56,9 +56,11 @@ func main() {
 		}
 	})
 
-	// The server starts listening. It should never encounter an error other
-	// than the server being closed.
-	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	// The server starts listening. The method `ListenAndServe` always returns
+	// a non-nil errors which should never be anything other than the server
+	// being closed if everything has worked correctly. If another error is 
+	// returned the user should decide how to handle the error. 
+	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("server encountered error: %v", err)
 	}
 }
