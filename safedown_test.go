@@ -1,6 +1,7 @@
 package safedown
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -11,7 +12,83 @@ import (
 
 // region Examples
 
-func ExampleNewShutdownActions() {
+func Example_withInterrupt() {
+	// This is fake code
+	go func(pid int) {
+		time.Sleep(time.Second)
+		process := os.Process{Pid: pid}
+		if errSignal := process.Signal(syscall.SIGTERM); errSignal != nil {
+			fmt.Printf("error sending signal: %s", errSignal)
+		}
+	}(os.Getpid())
+
+	defer fmt.Println("Finished")
+
+	// The shutdown actions are initialised and will only run
+	// if one of the provided signals is received.
+	sa := NewShutdownActions(FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
+
+	// Sets the function to be called if a signal is received
+	sa.SetOnSignal(func(signal os.Signal) {
+		fmt.Printf("Signal received: %s\n", signal.String())
+	})
+
+	// The context can be cancelled be either through the
+	// shutdown actions or via the defer.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sa.AddActions(cancel)
+
+	fmt.Println("Processing starting")
+	t := time.After(2 * time.Second)
+	select {
+	case <-ctx.Done():
+		fmt.Println("Context cancelled")
+	case <-t:
+		fmt.Println("Ticker ticked")
+	}
+
+	// Output:
+	// Processing starting
+	// Signal received: terminated
+	// Context cancelled
+	// Finished
+}
+
+func Example_withoutInterrupt() {
+	defer fmt.Println("Finished")
+
+	// The shutdown actions are initialised and will only run
+	// if one of the provided signals is received.
+	sa := NewShutdownActions(FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
+
+	// Sets the function to be called if a signal is received
+	sa.SetOnSignal(func(signal os.Signal) {
+		fmt.Printf("Signal received: %s\n", signal.String())
+	})
+
+	// The context can be cancelled be either through the
+	// shutdown actions or via the defer.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sa.AddActions(cancel)
+
+	fmt.Println("Processing starting")
+	t := time.After(2 * time.Second)
+	select {
+	case <-ctx.Done():
+		fmt.Println("Context cancelled")
+	case <-t:
+		fmt.Println("Ticker ticked")
+	}
+
+	// Output:
+	// Processing starting
+	// Ticker ticked
+	// Finished
+}
+
+func Example_withShutDown() {
 	// Creates the shutdown actions and defers the Shutdown method.
 	sa := NewShutdownActions(FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
 	defer sa.Shutdown()
