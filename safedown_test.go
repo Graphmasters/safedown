@@ -1,4 +1,4 @@
-package safedown
+package safedown_test
 
 import (
 	"context"
@@ -8,17 +8,21 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/Graphmasters/safedown"
 )
 
 // region Examples
 
 func Example_withInterrupt() {
-	// This is fake code
+	// This code sends a termination signal being sent. This is here purely
+	// to demonstrate functionality and should not be included in any production
+	// code.
 	go func(pid int) {
 		time.Sleep(time.Second)
 		process := os.Process{Pid: pid}
-		if errSignal := process.Signal(syscall.SIGTERM); errSignal != nil {
-			fmt.Printf("error sending signal: %s", errSignal)
+		if err := process.Signal(syscall.SIGTERM); err != nil {
+			fmt.Printf("error sending signal: %s", err)
 		}
 	}(os.Getpid())
 
@@ -26,7 +30,7 @@ func Example_withInterrupt() {
 
 	// The shutdown actions are initialised and will only run
 	// if one of the provided signals is received.
-	sa := NewShutdownActions(FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
 
 	// Sets the function to be called if a signal is received
 	sa.SetOnSignal(func(signal os.Signal) {
@@ -60,7 +64,7 @@ func Example_withoutInterrupt() {
 
 	// The shutdown actions are initialised and will only run
 	// if one of the provided signals is received.
-	sa := NewShutdownActions(FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
 
 	// Sets the function to be called if a signal is received
 	sa.SetOnSignal(func(signal os.Signal) {
@@ -90,7 +94,7 @@ func Example_withoutInterrupt() {
 
 func Example_withShutDown() {
 	// Creates the shutdown actions and defers the Shutdown method.
-	sa := NewShutdownActions(FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
 	defer sa.Shutdown()
 
 	// Sets the function to be called if a signal is received
@@ -134,7 +138,7 @@ func TestShutdownActions_OnSignal(t *testing.T) {
 
 	wg.Add(1)
 	expected := os.Interrupt
-	actionsA := NewShutdownActions(FirstInLastDone, expected)
+	actionsA := safedown.NewShutdownActions(safedown.FirstInLastDone, expected)
 	actionsA.SetOnSignal(func(received os.Signal) {
 		if received != expected {
 			errs <- fmt.Errorf("signal received was %s instead of %s", received.String(), expected.String())
@@ -169,7 +173,7 @@ func TestShutdownActions_OnSignal_Multiple(t *testing.T) {
 
 	// Shutdown actions only listen for the expected signal.
 	// The OnSignal method should be triggered.
-	actionsA := NewShutdownActions(FirstInLastDone, expected)
+	actionsA := safedown.NewShutdownActions(safedown.FirstInLastDone, expected)
 	actionsA.SetOnSignal(func(received os.Signal) {
 		if received != expected {
 			errs <- fmt.Errorf("signal received was %s instead of %s", received.String(), expected.String())
@@ -180,7 +184,7 @@ func TestShutdownActions_OnSignal_Multiple(t *testing.T) {
 	// Shutdown actions listens for the expected and
 	// unexpected signal. The OnSignal method should be
 	// triggered.
-	actionsB := NewShutdownActions(FirstInLastDone, expected, unexpected)
+	actionsB := safedown.NewShutdownActions(safedown.FirstInLastDone, expected, unexpected)
 	actionsB.SetOnSignal(func(received os.Signal) {
 		if received != expected {
 			errs <- fmt.Errorf("signal received was %s instead of %s", received.String(), expected.String())
@@ -190,7 +194,7 @@ func TestShutdownActions_OnSignal_Multiple(t *testing.T) {
 
 	// Shutdown actions only listen for the unexpected signal.
 	// The OnSignal method should not be triggered.
-	actionsC := NewShutdownActions(FirstInLastDone, unexpected)
+	actionsC := safedown.NewShutdownActions(safedown.FirstInLastDone, unexpected)
 	actionsC.SetOnSignal(func(received os.Signal) {
 		errs <- fmt.Errorf("an unexpected signal (%s) was received", received.String())
 	})
@@ -209,7 +213,7 @@ func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
 	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
 
 	count := 0
-	sa := NewShutdownActions(FirstInFirstDone)
+	sa := safedown.NewShutdownActions(safedown.FirstInFirstDone)
 	sa.AddActions(counter(t, &wg, 1, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 3, &count))
@@ -225,7 +229,7 @@ func TestNewShutdownActions_FirstInLastDone(t *testing.T) {
 	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
 
 	count := 0
-	sa := NewShutdownActions(FirstInLastDone)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
 	sa.AddActions(counter(t, &wg, 3, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 1, &count))
