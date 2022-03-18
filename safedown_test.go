@@ -14,9 +14,9 @@ import (
 
 // region Examples
 
-// Example_withSignal demonstrates how setting up the safedown's shutdown actions
-// works when a signal is received.
-func Example_withSignal() {
+// Example_withSignalReceived demonstrates how setting up the safedown's
+// shutdown actions works when a signal is received.
+func Example_withSignalReceived() {
 	// This code sends a termination signal being sent. This is here purely
 	// to demonstrate functionality and should not be included in any production
 	// code.
@@ -61,10 +61,10 @@ func Example_withSignal() {
 	// Finished
 }
 
-// Example_withoutSignal demonstrates how setting up the safedown's shutdown actions
-// works when no signal is received (and the program can terminate of its own
-// accord).
-func Example_withoutSignal() {
+// Example_withoutSignalReceived demonstrates how setting up the safedown's
+// shutdown actions works when no signal is received (and the program can
+// terminate of its own accord).
+func Example_withoutSignalReceived() {
 	defer fmt.Println("Finished")
 
 	// The shutdown actions are initialised and will only run
@@ -100,7 +100,7 @@ func Example_withoutSignal() {
 // Example_withShutDown demonstrates how to use the Shutdown method can be used.
 func Example_withShutDown() {
 	// Creates the shutdown actions and defers the Shutdown method.
-	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
 	defer sa.Shutdown()
 
 	// Sets the function to be called if a signal is received
