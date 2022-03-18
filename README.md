@@ -1,8 +1,10 @@
 # Safedown
 
 Safedown is for ensuring that an application shuts down 
-gracefully even when termination or interruption signals 
-are received. 
+gracefully and correctly. This includes the cases when 
+either a termination/interruption signal is received,
+or when shutdown actions across goroutines needs to be 
+coordinated.
  
 Adding shutdown actions along with a set of signals allows 
 for methods (in this case `cancel`) to be run when a 
