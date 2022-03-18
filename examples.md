@@ -28,13 +28,13 @@ func main() {
 	// unimportant.
 	db, err := badger.Open(badger.DefaultOptions("/path/to/badger/file"))
 	if err != nil {
-		log.Fatalf("unable to open badger: %v", err)
+		log.Fatalf("unable to open badger: %v\n", err)
 	}
 	sa.AddActions(func() {
 		// It is up to the user how the error (if applicable) from closing
 		// should be handled. This is only for illustrative purposes.
 		if err := db.Close(); err != nil {
-			log.Printf("failed to close database: %v", err)
+			log.Printf("failed to close database: %v\n", err)
 		}
 	})
 
@@ -53,7 +53,7 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			log.Printf("failed to shutdown server: %v", err)
+			log.Printf("failed to shutdown server: %v\n", err)
 		}
 	})
 
@@ -64,7 +64,7 @@ func main() {
 	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		// It is up to the user how the error should be handled. This is only 
 		// for illustrative purposes.
-		log.Fatalf("server encountered error: %v", err)
+		log.Printf("server encountered error: %v", err)
 	}
 }
 
