@@ -21,7 +21,8 @@ func main() {
 	// will allow the HTTP server to keep using the database while gracefully
 	// shutting down.
 	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
-
+    defer sa.Shutdown()
+	
 	// The database is opened with the close method being added to the shutdown
 	// actions. The choice of database, i.e. "badger", was arbitrary and
 	// unimportant.
@@ -30,8 +31,8 @@ func main() {
 		log.Fatalf("unable to open badger: %v", err)
 	}
 	sa.AddActions(func() {
-		// It is upto the user how the error (if applicable) from closing
-		// should be handled.
+		// It is up to the user how the error (if applicable) from closing
+		// should be handled. This is only for illustrative purposes.
 		if err := db.Close(); err != nil {
 			log.Printf("failed to close database: %v", err)
 		}
@@ -61,6 +62,8 @@ func main() {
 	// being closed if everything has worked correctly. If another error is 
 	// returned the user should decide how to handle the error. 
 	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		// It is up to the user how the error should be handled. This is only 
+		// for illustrative purposes.
 		log.Fatalf("server encountered error: %v", err)
 	}
 }
