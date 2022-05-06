@@ -7,8 +7,6 @@ are received.
 Adding shutdown actions along with a set of signals allows 
 for methods (in this case `cancel`) to be run when a 
 termination signal, or similar, is received.
-
-
 ```go
 package main
 
