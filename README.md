@@ -8,9 +8,6 @@ Adding shutdown actions along with a set of signals allows
 for methods (in this case `cancel`) to be run when a 
 termination signal, or similar, is received.
 
-Included below are simple examples to demonstrate the core
-concepts while other more complicated common examples can 
-be found [here](examples.md). 
 
 ```go
 package main
@@ -86,6 +83,9 @@ func main() {
 One can also manage shutdown actions across goroutines by 
 creating the shutdown actions without any signals to be 
 listened for.
+
+Additional examples can be found in the examples module
+1. [HTTP server with database](examples/http_server_with_database/main.go).
 
 ### F.A.Q.
 

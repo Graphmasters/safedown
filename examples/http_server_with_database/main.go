@@ -1,6 +1,3 @@
-### HTTP server with Database
-
-```go
 package main
 
 import (
@@ -21,8 +18,8 @@ func main() {
 	// will allow the HTTP server to keep using the database while gracefully
 	// shutting down.
 	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
-    defer sa.Shutdown()
-	
+	defer sa.Shutdown()
+
 	// The database is opened with the close method being added to the shutdown
 	// actions. The choice of database, i.e. "badger", was arbitrary and
 	// unimportant.
@@ -59,13 +56,11 @@ func main() {
 
 	// The server starts listening. The method `ListenAndServe` always returns
 	// a non-nil errors which should never be anything other than the server
-	// being closed if everything has worked correctly. If another error is 
-	// returned the user should decide how to handle the error. 
+	// being closed if everything has worked correctly. If another error is
+	// returned the user should decide how to handle the error.
 	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		// It is up to the user how the error should be handled. This is only 
+		// It is up to the user how the error should be handled. This is only
 		// for illustrative purposes.
 		log.Printf("server encountered error: %v", err)
 	}
 }
-
-```
