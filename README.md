@@ -82,6 +82,9 @@ One can also manage shutdown actions across goroutines by
 creating the shutdown actions without any signals to be 
 listened for.
 
+Additional examples can be found in the examples module
+1. [HTTP server with database](examples/http_server_with_database/main.go).
+
 ### F.A.Q.
 
 - *How do I ensure that the shutdown actions complete before
