@@ -47,7 +47,7 @@ jobs:
       - name: Change to examples module
         run: cd ./examples
 
-      - name: Test
+      - name: Build examples
         run: go build -v ./...
 
   # The 'lint' job runs the linter
