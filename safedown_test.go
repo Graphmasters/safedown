@@ -1,44 +1,14 @@
-package safedown
+package safedown_test
 
 import (
 	"fmt"
 	"os"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
+
+	"github.com/Graphmasters/safedown"
 )
-
-// region Examples
-
-func ExampleNewShutdownActions() {
-	// Creates the shutdown actions and defers the Shutdown method.
-	sa := NewShutdownActions(FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
-	defer sa.Shutdown()
-
-	// Sets the function to be called if a signal is received
-	sa.SetOnSignal(func(signal os.Signal) {
-		fmt.Printf("A signal was received: %s\n", signal.String())
-	})
-
-	// The first action added will be the last done
-	sa.AddActions(func() {
-		fmt.Println("... and this will be done last.")
-	})
-
-	// The last action added will be the first done
-	sa.AddActions(func() {
-		fmt.Println("This will be done first ...")
-	})
-
-	// Output:
-	// This will be done first ...
-	// ... and this will be done last.
-}
-
-// endregion
-
-// region Tests
 
 // TestShutdownActions_OnSignal tests if the correct signal is received.
 // It also indirectly checks that the shutdown actions are intercepting
@@ -57,7 +27,7 @@ func TestShutdownActions_OnSignal(t *testing.T) {
 
 	wg.Add(1)
 	expected := os.Interrupt
-	actionsA := NewShutdownActions(FirstInLastDone, expected)
+	actionsA := safedown.NewShutdownActions(safedown.FirstInLastDone, expected)
 	actionsA.SetOnSignal(func(received os.Signal) {
 		if received != expected {
 			errs <- fmt.Errorf("signal received was %s instead of %s", received.String(), expected.String())
@@ -92,7 +62,7 @@ func TestShutdownActions_OnSignal_Multiple(t *testing.T) {
 
 	// Shutdown actions only listen for the expected signal.
 	// The OnSignal method should be triggered.
-	actionsA := NewShutdownActions(FirstInLastDone, expected)
+	actionsA := safedown.NewShutdownActions(safedown.FirstInLastDone, expected)
 	actionsA.SetOnSignal(func(received os.Signal) {
 		if received != expected {
 			errs <- fmt.Errorf("signal received was %s instead of %s", received.String(), expected.String())
@@ -103,7 +73,7 @@ func TestShutdownActions_OnSignal_Multiple(t *testing.T) {
 	// Shutdown actions listens for the expected and
 	// unexpected signal. The OnSignal method should be
 	// triggered.
-	actionsB := NewShutdownActions(FirstInLastDone, expected, unexpected)
+	actionsB := safedown.NewShutdownActions(safedown.FirstInLastDone, expected, unexpected)
 	actionsB.SetOnSignal(func(received os.Signal) {
 		if received != expected {
 			errs <- fmt.Errorf("signal received was %s instead of %s", received.String(), expected.String())
@@ -113,7 +83,7 @@ func TestShutdownActions_OnSignal_Multiple(t *testing.T) {
 
 	// Shutdown actions only listen for the unexpected signal.
 	// The OnSignal method should not be triggered.
-	actionsC := NewShutdownActions(FirstInLastDone, unexpected)
+	actionsC := safedown.NewShutdownActions(safedown.FirstInLastDone, unexpected)
 	actionsC.SetOnSignal(func(received os.Signal) {
 		errs <- fmt.Errorf("an unexpected signal (%s) was received", received.String())
 	})
@@ -132,7 +102,7 @@ func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
 	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
 
 	count := 0
-	sa := NewShutdownActions(FirstInFirstDone)
+	sa := safedown.NewShutdownActions(safedown.FirstInFirstDone)
 	sa.AddActions(counter(t, &wg, 1, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 3, &count))
@@ -148,16 +118,12 @@ func TestNewShutdownActions_FirstInLastDone(t *testing.T) {
 	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
 
 	count := 0
-	sa := NewShutdownActions(FirstInLastDone)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
 	sa.AddActions(counter(t, &wg, 3, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 1, &count))
 	sa.Shutdown()
 }
-
-// endregion
-
-// region Helpers
 
 // addWaitGroupDeadline adds waits till either the wait group
 // is done or until the deadline is reached. If the deadline
@@ -223,5 +189,3 @@ func sendSignalToSelf(t *testing.T, signal os.Signal) {
 		t.Fail()
 	}
 }
-
-// endregion
