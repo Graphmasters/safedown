@@ -47,10 +47,12 @@ jobs:
         run: go build -v -o ./outputs/ ./...
 
 
-  # The 'lint' job runs the linter
+  # The 'lint' job runs the linter. It is only done on pull requests because
+  # the linter may change an fail on the push after it passed on a pull request.
   golangci:
     name: lint
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     steps:
       - name: Check out code
         uses: actions/checkout@v3
