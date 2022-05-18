@@ -179,7 +179,7 @@ func TestNewShutdownActions_PostShutdownStrategy_PerformCoordinately(t *testing.
 
 	count := int32(0)
 	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
-	sa.UsePostShutdownStrategy(safedown.PerformCoordinately)
+	sa.UsePostShutdownStrategy(safedown.PerformCoordinatelyInBackground)
 	sa.AddActions(counter(t, &wg, 3, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 1, &count))
@@ -189,7 +189,7 @@ func TestNewShutdownActions_PostShutdownStrategy_PerformCoordinately(t *testing.
 	// hard to predict. The delays in the actions and sleeps are sufficiently
 	// large to make the behaviour more predictable.
 	//
-	// The PerformCoordinately strategy means that the first action added
+	// The PerformCoordinatelyInBackground strategy means that the first action added
 	// starts and then the rest happen in reverse order.
 
 	sa.AddActions(counterWithDelay(t, &wg, 4, &count, 30*time.Millisecond))
@@ -215,8 +215,35 @@ func TestNewShutdownActions_PostShutdownStrategy_PerformImmediately(t *testing.T
 	// hard to predict. The delays in the actions and sleeps are sufficiently
 	// large to make the behaviour more predictable.
 	//
-	// The PerformImmediately strategy means that all actions start and the
-	// ones with the shortest delays have their counters incremented first.
+	// The PerformImmediately strategy means that the actions are performed in
+	// order.
+
+	sa.AddActions(counterWithDelay(t, &wg, 4, &count, 30*time.Millisecond))
+	time.Sleep(time.Millisecond)
+	sa.AddActions(counterWithDelay(t, &wg, 5, &count, 20*time.Millisecond))
+	time.Sleep(time.Millisecond)
+	sa.AddActions(counterWithDelay(t, &wg, 6, &count, 10*time.Millisecond))
+}
+
+func TestNewShutdownActions_PostShutdownStrategy_PerformImmediatelyInBackground(t *testing.T) {
+	wg := sync.WaitGroup{}
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
+
+	count := int32(0)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
+	sa.UsePostShutdownStrategy(safedown.PerformImmediatelyInBackground)
+	sa.AddActions(counter(t, &wg, 3, &count))
+	sa.AddActions(counter(t, &wg, 2, &count))
+	sa.AddActions(counter(t, &wg, 1, &count))
+	sa.Shutdown()
+
+	// Actions are to be performed in go routines which means that the order is
+	// hard to predict. The delays in the actions and sleeps are sufficiently
+	// large to make the behaviour more predictable.
+	//
+	// The PerformImmediatelyInBackground strategy means that all actions start
+	// and the ones with the shortest delays have their counters incremented
+	// first.
 
 	sa.AddActions(counterWithDelay(t, &wg, 6, &count, 30*time.Millisecond))
 	time.Sleep(time.Millisecond)

@@ -20,9 +20,10 @@ const (
 type PostShutdownStrategy uint8
 
 const (
-	DoNothing           PostShutdownStrategy = iota // The actions will be ignored.
-	PerformImmediately                              // The actions will be performed immediately (in go routine).
-	PerformCoordinately                             // The actions will be added to the list of being performed with the order being respected as much as possible.
+	DoNothing                       PostShutdownStrategy = iota // The actions will be ignored.
+	PerformImmediately                                          // The actions will be performed immediately (in go routine).
+	PerformImmediatelyInBackground                              // The actions will be performed immediately (in go routine).
+	PerformCoordinatelyInBackground                             // The actions will be added to the list of being performed with the order being respected as much as possible.
 )
 
 // ShutdownActions contains actions that are run when the os receives an interrupt signal.
@@ -99,16 +100,20 @@ func (sa *ShutdownActions) AddActions(actions ...func()) {
 	}
 
 	// The decision to perform the actions in the background is a pragmatic one.
-	// In the case of PerformCoordinately there would need to be an additional
+	// In the case of PerformCoordinatelyInBackground there would need to be an additional
 	// mechanism to record if the actions had been performed which would require
 	// significant changes.
 
 	switch sa.strategy {
 	case PerformImmediately:
 		sa.mutex.Unlock()
+		sa.performActions(actions)
+		return
+	case PerformImmediatelyInBackground:
+		sa.mutex.Unlock()
 		go sa.performActions(actions)
 		return
-	case PerformCoordinately:
+	case PerformCoordinatelyInBackground:
 		sa.actions = append(sa.actions, actions...)
 		if sa.isProcessingStoredActions {
 			sa.mutex.Unlock()
