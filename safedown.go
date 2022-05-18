@@ -15,12 +15,14 @@ const (
 	FirstInLastDone  Order = false // Actions are executed in the reversed order they are added.
 )
 
+// PostShutdownStrategy represent the preferred behaviour for actions added
+// after shutdown has been triggered, either manually or from a signal.
 type PostShutdownStrategy uint8
 
 const (
-	DoNothing PostShutdownStrategy = iota
-	PerformImmediately
-	PerformCoordinately
+	DoNothing           PostShutdownStrategy = iota // The actions will be ignored.
+	PerformImmediately                              // The actions will be performed immediately (in go routine).
+	PerformCoordinately                             // The actions will be added to the list of being performed with the order being respected as much as possible.
 )
 
 // ShutdownActions contains actions that are run when the os receives an interrupt signal.
