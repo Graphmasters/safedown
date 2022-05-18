@@ -15,17 +15,27 @@ const (
 	FirstInLastDone  Order = false // Actions are executed in the reversed order they are added.
 )
 
+type PostShutdownStrategy uint8
+
+const (
+	DoNothing PostShutdownStrategy = iota
+	PerformImmediately
+	PerformCoordinately
+)
+
 // ShutdownActions contains actions that are run when the os receives an interrupt signal.
 // This object must be created using the NewShutdownActions function.
 type ShutdownActions struct {
-	order        Order           // This determines the order the actions will be done.
-	actions      []func()        // The actions done on shutdown.
-	onSignalFunc func(os.Signal) // The function to be called when a signal is received.
-	stopCh       chan struct{}   // A channel to stop listening for signals.
-	stopOnce     sync.Once       // Ensures listening to signals is stopped once.
-	shutdownCh   chan struct{}   // A channel that indicates if shutdown has been completed.
-	shutdownOnce sync.Once       // Ensures shutdown actions are only done once.
-	mutex        sync.Mutex      // A mutex to avoid clashes handling actions or onSignal.
+	order        Order                // This determines the order the actions will be done.
+	actions      []func()             // The actions done on shutdown.
+	onSignalFunc func(os.Signal)      // The function to be called when a signal is received.
+	strategy     PostShutdownStrategy // The strategy for actions after shutdown has been triggered
+
+	stopCh       chan struct{} // A channel to stop listening for signals.
+	stopOnce     sync.Once     // Ensures listening to signals is stopped once.
+	shutdownCh   chan struct{} // A channel that indicates if shutdown has been completed.
+	shutdownOnce sync.Once     // Ensures shutdown actions are only done once.
+	mutex        sync.Mutex    // A mutex to avoid clashes handling actions or onSignal.
 }
 
 // NewShutdownActions creates and initialises a new set of shutdown actions.
@@ -96,6 +106,15 @@ func (sa *ShutdownActions) SetOnSignal(onSignal func(os.Signal)) {
 func (sa *ShutdownActions) Shutdown() {
 	sa.closeStopCh()
 	sa.shutdown()
+}
+
+// UsePostShutdownStrategy sets the strategy for actions added after shutdown
+// has been triggered. This strategy is typically only used if the application
+// receives a signal during its initialisation.
+func (sa *ShutdownActions) UsePostShutdownStrategy(strategy PostShutdownStrategy) {
+	sa.mutex.Lock()
+	sa.strategy = strategy
+	sa.mutex.Unlock()
 }
 
 // Wait waits until all the shutdown actions have been
