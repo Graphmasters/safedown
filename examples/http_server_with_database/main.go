@@ -18,6 +18,7 @@ func main() {
 	// will allow the HTTP server to keep using the database while gracefully
 	// shutting down.
 	sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
+	sa.UsePostShutdownStrategy(safedown.PerformImmediately)
 	defer sa.Shutdown()
 
 	// The database is opened with the close method being added to the shutdown

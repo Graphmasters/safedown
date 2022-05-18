@@ -15,17 +15,33 @@ const (
 	FirstInLastDone  Order = false // Actions are executed in the reversed order they are added.
 )
 
+// PostShutdownStrategy represent the preferred behaviour for actions added
+// after shutdown has been triggered, either manually or from a signal.
+type PostShutdownStrategy uint8
+
+const (
+	DoNothing                       PostShutdownStrategy = iota // The actions will be ignored.
+	PerformImmediately                                          // The actions will be performed immediately (in go routine).
+	PerformImmediatelyInBackground                              // The actions will be performed immediately (in go routine).
+	PerformCoordinatelyInBackground                             // The actions will be added to the list of being performed with the order being respected as much as possible.
+)
+
 // ShutdownActions contains actions that are run when the os receives an interrupt signal.
 // This object must be created using the NewShutdownActions function.
 type ShutdownActions struct {
-	order        Order           // This determines the order the actions will be done.
-	actions      []func()        // The actions done on shutdown.
-	onSignalFunc func(os.Signal) // The function to be called when a signal is received.
-	stopCh       chan struct{}   // A channel to stop listening for signals.
-	stopOnce     sync.Once       // Ensures listening to signals is stopped once.
-	shutdownCh   chan struct{}   // A channel that indicates if shutdown has been completed.
-	shutdownOnce sync.Once       // Ensures shutdown actions are only done once.
-	mutex        sync.Mutex      // A mutex to avoid clashes handling actions or onSignal.
+	order        Order                // This determines the order the actions will be done.
+	actions      []func()             // The actions done on shutdown.
+	onSignalFunc func(os.Signal)      // The function to be called when a signal is received.
+	strategy     PostShutdownStrategy // The strategy for actions after shutdown has been triggered
+
+	isShutdownTriggered       bool // This is true if the shutdown actions have been triggered
+	isProcessingStoredActions bool // This is true only while or immediately before stored actions are being processed.
+
+	stopCh       chan struct{} // A channel to stop listening for signals.
+	stopOnce     sync.Once     // Ensures listening to signals is stopped once.
+	shutdownCh   chan struct{} // A channel that indicates if shutdown has been completed.
+	shutdownOnce sync.Once     // Ensures shutdown actions are only done once.
+	mutex        sync.Mutex    // A mutex to avoid clashes handling actions or onSignal.
 }
 
 // NewShutdownActions creates and initialises a new set of shutdown actions.
@@ -71,14 +87,47 @@ func NewShutdownActions(order Order, signals ...os.Signal) *ShutdownActions {
 	return sa
 }
 
-// AddActions adds actions to be run on shutdown or when a
-// signal is received. Any action added after a signal has
-// been received or the Shutdown method has been called will
-// not be executed.
+// AddActions adds actions to be run on Shutdown or when a signal is received.
+//
+// Any action added after shutdown has been triggered will be handled according
+// to the post shutdown strategy.
 func (sa *ShutdownActions) AddActions(actions ...func()) {
 	sa.mutex.Lock()
-	sa.actions = append(sa.actions, actions...)
-	sa.mutex.Unlock()
+	if !sa.isShutdownTriggered {
+		sa.actions = append(sa.actions, actions...)
+		sa.mutex.Unlock()
+		return
+	}
+
+	// The decision to perform the actions in the background is a pragmatic one.
+	// In the case of PerformCoordinatelyInBackground there would need to be an additional
+	// mechanism to record if the actions had been performed which would require
+	// significant changes.
+
+	switch sa.strategy {
+	case PerformImmediately:
+		sa.mutex.Unlock()
+		sa.performActions(actions)
+		return
+	case PerformImmediatelyInBackground:
+		sa.mutex.Unlock()
+		go sa.performActions(actions)
+		return
+	case PerformCoordinatelyInBackground:
+		sa.actions = append(sa.actions, actions...)
+		if sa.isProcessingStoredActions {
+			sa.mutex.Unlock()
+			return
+		}
+
+		sa.isProcessingStoredActions = true
+		sa.mutex.Unlock()
+		go sa.performStoredActions()
+	default:
+		sa.mutex.Unlock()
+		return
+	}
+
 }
 
 // SetOnSignal sets the method which will be called if a signal is received.
@@ -96,6 +145,15 @@ func (sa *ShutdownActions) SetOnSignal(onSignal func(os.Signal)) {
 func (sa *ShutdownActions) Shutdown() {
 	sa.closeStopCh()
 	sa.shutdown()
+}
+
+// UsePostShutdownStrategy sets the strategy for actions added after shutdown
+// has been triggered. This strategy is typically only used if the application
+// receives a signal during its initialisation.
+func (sa *ShutdownActions) UsePostShutdownStrategy(strategy PostShutdownStrategy) {
+	sa.mutex.Lock()
+	sa.strategy = strategy
+	sa.mutex.Unlock()
 }
 
 // Wait waits until all the shutdown actions have been
@@ -131,23 +189,48 @@ func (sa *ShutdownActions) onSignal(s os.Signal) {
 	onSignal(s)
 }
 
+func (sa *ShutdownActions) performActions(actions []func()) {
+	for i := range actions {
+		if sa.order == FirstInFirstDone {
+			actions[i]()
+		} else {
+			actions[len(actions)-i-1]()
+		}
+	}
+}
+
+func (sa *ShutdownActions) performStoredActions() {
+	for {
+		var action func()
+		sa.mutex.Lock()
+		switch {
+		case len(sa.actions) == 0:
+			sa.isProcessingStoredActions = false
+			sa.mutex.Unlock()
+			return
+		case sa.order == FirstInLastDone:
+			action = sa.actions[len(sa.actions)-1]
+			sa.actions = sa.actions[:len(sa.actions)-1]
+		default:
+			action = sa.actions[0]
+			sa.actions = sa.actions[1:]
+		}
+		sa.mutex.Unlock()
+
+		action()
+	}
+}
+
 // shutdown runs the shutdown actions
 func (sa *ShutdownActions) shutdown() {
 	sa.shutdownOnce.Do(
 		func() {
-			// Gets current length of actions
 			sa.mutex.Lock()
-			l := len(sa.actions)
+			sa.isShutdownTriggered = true
+			sa.isProcessingStoredActions = true
 			sa.mutex.Unlock()
 
-			// Executes actions in order
-			for i := 0; i < l; i++ {
-				if sa.order == FirstInFirstDone {
-					sa.actions[i]()
-				} else {
-					sa.actions[l-i-1]()
-				}
-			}
+			sa.performStoredActions()
 
 			// Closes the shutdown channel indicating shutdown
 			// is complete.

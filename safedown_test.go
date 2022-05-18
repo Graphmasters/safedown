@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -101,7 +102,7 @@ func TestNewShutdownActions_FirstInFirstDone(t *testing.T) {
 	wg := sync.WaitGroup{}
 	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
 
-	count := 0
+	count := int32(0)
 	sa := safedown.NewShutdownActions(safedown.FirstInFirstDone)
 	sa.AddActions(counter(t, &wg, 1, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
@@ -117,12 +118,138 @@ func TestNewShutdownActions_FirstInLastDone(t *testing.T) {
 	wg := sync.WaitGroup{}
 	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
 
-	count := 0
+	count := int32(0)
 	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
 	sa.AddActions(counter(t, &wg, 3, &count))
 	sa.AddActions(counter(t, &wg, 2, &count))
 	sa.AddActions(counter(t, &wg, 1, &count))
 	sa.Shutdown()
+}
+
+// TestNewShutdownActions_PostShutdownStrategy_DoNothing checks that the
+// if no post shutdown strategy is set the action doesn't get performed.
+func TestNewShutdownActions_PostShutdownStrategy_Default(t *testing.T) {
+	wg := sync.WaitGroup{}
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
+
+	count := int32(0)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
+	sa.AddActions(counter(t, &wg, 3, &count))
+	sa.AddActions(counter(t, &wg, 2, &count))
+	sa.AddActions(counter(t, &wg, 1, &count))
+	sa.Shutdown()
+
+	// The action added shouldn't be done. A sleep was added because actions
+	// are performed in a go routine and the sleep is an attempt to decrease
+	// the chance that the above action isn't being missed to due a race
+	// condition.
+
+	sa.AddActions(counter(t, &wg, -1, &count))
+	time.Sleep(time.Millisecond)
+	wg.Done()
+}
+
+// TestNewShutdownActions_PostShutdownStrategy_DoNothing checks that the
+// strategy
+func TestNewShutdownActions_PostShutdownStrategy_DoNothing(t *testing.T) {
+	wg := sync.WaitGroup{}
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
+
+	count := int32(0)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
+	sa.UsePostShutdownStrategy(safedown.DoNothing)
+	sa.AddActions(counter(t, &wg, 3, &count))
+	sa.AddActions(counter(t, &wg, 2, &count))
+	sa.AddActions(counter(t, &wg, 1, &count))
+	sa.Shutdown()
+
+	// The action added shouldn't be done. A sleep was added because actions
+	// are performed in a go routine and the sleep is an attempt to decrease
+	// the chance that the above action isn't being missed to due a race
+	// condition.
+
+	sa.AddActions(counter(t, &wg, -1, &count))
+	time.Sleep(time.Millisecond)
+	wg.Done()
+}
+
+func TestNewShutdownActions_PostShutdownStrategy_PerformCoordinately(t *testing.T) {
+	wg := sync.WaitGroup{}
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
+
+	count := int32(0)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
+	sa.UsePostShutdownStrategy(safedown.PerformCoordinatelyInBackground)
+	sa.AddActions(counter(t, &wg, 3, &count))
+	sa.AddActions(counter(t, &wg, 2, &count))
+	sa.AddActions(counter(t, &wg, 1, &count))
+	sa.Shutdown()
+
+	// Actions are to be performed in go routines which means that the order is
+	// hard to predict. The delays in the actions and sleeps are sufficiently
+	// large to make the behaviour more predictable.
+	//
+	// The PerformCoordinatelyInBackground strategy means that the first action added
+	// starts and then the rest happen in reverse order.
+
+	sa.AddActions(counterWithDelay(t, &wg, 4, &count, 30*time.Millisecond))
+	time.Sleep(time.Millisecond)
+	sa.AddActions(counterWithDelay(t, &wg, 6, &count, 20*time.Millisecond))
+	time.Sleep(time.Millisecond)
+	sa.AddActions(counterWithDelay(t, &wg, 5, &count, 10*time.Millisecond))
+}
+
+func TestNewShutdownActions_PostShutdownStrategy_PerformImmediately(t *testing.T) {
+	wg := sync.WaitGroup{}
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
+
+	count := int32(0)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
+	sa.UsePostShutdownStrategy(safedown.PerformImmediately)
+	sa.AddActions(counter(t, &wg, 3, &count))
+	sa.AddActions(counter(t, &wg, 2, &count))
+	sa.AddActions(counter(t, &wg, 1, &count))
+	sa.Shutdown()
+
+	// Actions are to be performed in go routines which means that the order is
+	// hard to predict. The delays in the actions and sleeps are sufficiently
+	// large to make the behaviour more predictable.
+	//
+	// The PerformImmediately strategy means that the actions are performed in
+	// order.
+
+	sa.AddActions(counterWithDelay(t, &wg, 4, &count, 30*time.Millisecond))
+	time.Sleep(time.Millisecond)
+	sa.AddActions(counterWithDelay(t, &wg, 5, &count, 20*time.Millisecond))
+	time.Sleep(time.Millisecond)
+	sa.AddActions(counterWithDelay(t, &wg, 6, &count, 10*time.Millisecond))
+}
+
+func TestNewShutdownActions_PostShutdownStrategy_PerformImmediatelyInBackground(t *testing.T) {
+	wg := sync.WaitGroup{}
+	defer addWaitGroupDeadline(t, &wg, time.Now().Add(time.Second))
+
+	count := int32(0)
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
+	sa.UsePostShutdownStrategy(safedown.PerformImmediatelyInBackground)
+	sa.AddActions(counter(t, &wg, 3, &count))
+	sa.AddActions(counter(t, &wg, 2, &count))
+	sa.AddActions(counter(t, &wg, 1, &count))
+	sa.Shutdown()
+
+	// Actions are to be performed in go routines which means that the order is
+	// hard to predict. The delays in the actions and sleeps are sufficiently
+	// large to make the behaviour more predictable.
+	//
+	// The PerformImmediatelyInBackground strategy means that all actions start
+	// and the ones with the shortest delays have their counters incremented
+	// first.
+
+	sa.AddActions(counterWithDelay(t, &wg, 6, &count, 30*time.Millisecond))
+	time.Sleep(time.Millisecond)
+	sa.AddActions(counterWithDelay(t, &wg, 5, &count, 20*time.Millisecond))
+	time.Sleep(time.Millisecond)
+	sa.AddActions(counterWithDelay(t, &wg, 4, &count, 10*time.Millisecond))
 }
 
 // addWaitGroupDeadline adds waits till either the wait group
@@ -162,11 +289,30 @@ func checkErrors(t *testing.T, errs chan error) {
 // counter creates a function that should be added to the shutdown actions.
 // The test will fail if the value given doesn't increment to the expected value.
 // nolint: gomnd
-func counter(t *testing.T, wg *sync.WaitGroup, expected int, value *int) func() {
+func counter(t *testing.T, wg *sync.WaitGroup, expected int32, value *int32) func() {
 	wg.Add(1)
 	return func() {
-		*value++
-		if *value != expected {
+		incrementedValue := atomic.AddInt32(value, 1)
+		if incrementedValue != expected {
+			t.Logf("counter value (%d) doesn't match expected (%d)", incrementedValue, expected)
+			t.Fail()
+		}
+		wg.Done()
+	}
+}
+
+// counterWithDelay creates a function that should be added to the shutdown actions.
+// The test will fail if the value given doesn't increment to the expected value.
+// There is a delay before the counter is incremented to pad times in an effort
+// to make the behaviour more predictable (useful for things happening in
+// go routines).
+func counterWithDelay(t *testing.T, wg *sync.WaitGroup, expected int32, value *int32, delay time.Duration) func() {
+	wg.Add(1)
+	return func() {
+		time.Sleep(delay)
+		incrementedValue := atomic.AddInt32(value, 1)
+		if incrementedValue != expected {
+			t.Logf("counter value (%d) doesn't match expected (%d)", incrementedValue, expected)
 			t.Fail()
 		}
 		wg.Done()

@@ -118,3 +118,27 @@ func Example_withShutDown() {
 	// This will be done first ...
 	// ... and this will be done last.
 }
+
+func Example_usePostShutdownStrategy() {
+	// Creates the shutdown actions and defers the Shutdown method.
+	sa := safedown.NewShutdownActions(safedown.FirstInLastDone)
+	sa.UsePostShutdownStrategy(safedown.PerformImmediately)
+
+	sa.AddActions(func() {
+		fmt.Println("... and this will be done next.")
+	})
+	sa.AddActions(func() {
+		fmt.Println("This will be done first ...")
+	})
+	sa.Shutdown()
+
+	sa.AddActions(func() {
+		fmt.Println("This will be done at the very end.")
+	})
+	time.Sleep(time.Millisecond) // This is required to because post shutdown actions are done in go routines.
+
+	// Output:
+	// This will be done first ...
+	// ... and this will be done next.
+	// This will be done at the very end.
+}

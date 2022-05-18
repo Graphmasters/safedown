@@ -24,7 +24,11 @@ func main() {
     // The shutdown actions are initialised and will only run
     // if one of the provided signals is received.
     sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
-
+	
+    // The post shutdown strategy is only required if the application
+    // is interrupted during initialisation.
+    sa.UsePostShutdownStrategy(safedown.PerformImmediately)
+	
     // The context can be cancelled be either through the 
     // shutdown actions or via the defer.
     ctx, cancel := context.WithCancel(context.Background())
@@ -64,6 +68,10 @@ func main() {
     sa := safedown.NewShutdownActions(safedown.FirstInLastDone, syscall.SIGTERM, syscall.SIGINT)
     defer sa.Shutdown()
 
+    // The post shutdown strategy is only required if the application
+    // is interrupted during initialisation.
+    sa.UsePostShutdownStrategy(safedown.PerformImmediately)
+	
     // The context can be cancelled be through the shutdown
     // action, triggered either by a signal or sa.Shutdown().
     ctx, cancel := context.WithCancel(context.Background())
