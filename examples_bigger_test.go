@@ -1,4 +1,4 @@
-package main
+package safedown_test
 
 import (
 	"context"
@@ -8,11 +8,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Graphmasters/safedown"
 	"github.com/dgraph-io/badger/v3"
+
+	"github.com/Graphmasters/safedown"
 )
 
-func main() {
+func Example_newShutdownActions_HTTPServerAndDatabase() {
 	// Safedown is initialised with the order "FirstInLastDone" to ensure
 	// that the database which will be added first and be closed last. This
 	// will allow the HTTP server to keep using the database while gracefully
