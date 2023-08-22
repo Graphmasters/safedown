@@ -13,7 +13,7 @@ type Order int
 const (
 	FirstInFirstDone Order = iota // Actions are executed in the order they are added.
 	FirstInLastDone               // Actions are executed in the reversed order they are added.
-	Parallel
+	Parallel                      // Each action is run in a separate go routine
 )
 
 // ShutdownActions contains actions that are run when the os receives an interrupt signal.
