@@ -8,11 +8,12 @@ import (
 )
 
 // Order represents the order that the shutdown actions will be executed.
-type Order bool
+type Order int
 
 const (
-	FirstInFirstDone Order = true  // Actions are executed in the order they are added.
-	FirstInLastDone  Order = false // Actions are executed in the reversed order they are added.
+	FirstInFirstDone Order = iota // Actions are executed in the order they are added.
+	FirstInLastDone               // Actions are executed in the reversed order they are added.
+	Parallel                      // Each action is run in a separate go routine
 )
 
 // ShutdownActions contains actions that are run when the os receives an interrupt signal.
@@ -140,12 +141,24 @@ func (sa *ShutdownActions) shutdown() {
 			l := len(sa.actions)
 			sa.mutex.Unlock()
 
-			// Executes actions in order
-			for i := 0; i < l; i++ {
-				if sa.order == FirstInFirstDone {
-					sa.actions[i]()
-				} else {
-					sa.actions[l-i-1]()
+			if sa.order == Parallel {
+				wg := sync.WaitGroup{}
+				for i := 0; i < l; i++ {
+					wg.Add(1)
+					go func(idx int) {
+						defer wg.Done()
+						sa.actions[idx]()
+					}(i)
+				}
+				wg.Wait()
+			} else {
+				// Executes actions in order
+				for i := 0; i < l; i++ {
+					if sa.order == FirstInFirstDone {
+						sa.actions[i]()
+					} else {
+						sa.actions[l-i-1]()
+					}
 				}
 			}
 
